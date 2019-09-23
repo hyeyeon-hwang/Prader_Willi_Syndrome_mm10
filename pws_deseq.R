@@ -95,9 +95,11 @@ rownames(columnData) <- c(
 )
 
 
-dds <- DESeqDataSetFromMatrix(countData = countMat,
+ddsFromMatrix <- DESeqDataSetFromMatrix(countData = countMat,
                               colData = columnData,
                               design = ~ condition)
 
 
+ddsObject <- DESeq(ddsFromMatrix)
+ddsResults <- results(ddsObject)
 
