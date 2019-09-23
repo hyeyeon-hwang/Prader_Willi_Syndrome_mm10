@@ -1,3 +1,9 @@
+# References
+# Analyzing RNA-seq data wth DESeq2:
+# 	http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#count-matrix-input
+# Beginner's guide to DESeq2:
+# 	https://bioc.ism.ac.jp/packages/2.14/bioc/vignettes/DESeq2/inst/doc/beginner.pdf
+
 library(tidyverse)
 #BiocManager::install("DESeq2")
 library(DESeq2)
@@ -30,13 +36,11 @@ fc.14 <- read.table(file = "featureCountsoutput/14_featureCounts.output.txt",
 geneIdList <- c(fc.1.2$Geneid, fc.3.4$Geneid, fc.5.6$Geneid, fc.7.8$Geneid, 
                 fc.9.10$Geneid, fc.11.12$Geneid, fc.13$Geneid, fc.14$Geneid) %>% unique()
 
-fc.output <- fc.1.2
-
 # test
-tail(fc.14$Geneid)
-head(geneIdList)
-head(geneMatch.14)
-head(fc.14)
+# tail(fc.14$Geneid)
+# head(geneIdList)
+# head(geneMatch.14)
+# head(fc.14)
 
 # gene matches
 geneMatch.1.2 <- match(geneIdList, fc.1.2$Geneid)
@@ -60,20 +64,20 @@ geneCount.14 <- fc.14[geneMatch.14, 2]
 
 countDf <- data.frame(
   gene.id = geneIdList,
-  s.1.2 = geneCount.1.2,
-  s.3.4 = geneCount.3.4,
-  s.5.6 = geneCount.5.6,
-  s.7.8 = geneCount.7.8,
-  s.9.10 = geneCount.9.10,
-  s.11.12 = geneCount.11.12,
-  s.13 = geneCount.13,
-  s.14 = geneCount.14
+  sample.1.2 = geneCount.1.2,
+  sample.3.4 = geneCount.3.4,
+  sample.5.6 = geneCount.5.6,
+  sample.7.8 = geneCount.7.8,
+  sample.9.10 = geneCount.9.10,
+  sample.11.12 = geneCount.11.12,
+  control.13 = geneCount.13,
+  control.14 = geneCount.14
 )
 
 countDf[is.na(countDf)] <- 0
-
 rownames(countDf) <- countDf$gene.id
-countDf
+
+#head(countDf)
 
 countMat <- countDf[, -1] %>% as.matrix()
 
@@ -94,12 +98,56 @@ rownames(columnData) <- c(
   "control.14"
 )
 
-
 ddsFromMatrix <- DESeqDataSetFromMatrix(countData = countMat,
                               colData = columnData,
                               design = ~ condition)
 
 
-ddsObject <- DESeq(ddsFromMatrix)
-ddsResults <- results(ddsObject)
+dds <- DESeq(ddsFromMatrix)
+ddsResults <- results(dds)
+
+# Error for vsd: Error in vst(dds, blind = FALSE) : 
+# less than 'nsub' rows with mean normalized count > 5, 
+# it is recommended to use varianceStabilizingTransformation directly
+vsd <- vst(dds, blind=FALSE) 
+rld <- rlog(dds, blind=FALSE)
+head(assay(vsd), 3)
+head(assay(rld), 3)
+
+# Section: Effects of transformations on the variance
+ntd <- normTransform(dds)
+# BiocManager::install("vsn")
+library(vsn)
+# meanSdPlot(assay(ntd))
+# Warning message:
+# Computation failed in `stat_binhex()`:
+# Package `hexbin` required for `stat_binhex`.
+# Please install and try again.
+
+
+# Heatmap of the count matrix
+# http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#count-matrix-input
+
+# install.packages("pheatmap")
+library(pheatmap)
+select <- order(rowMeans(counts(dds, normalized = TRUE)), decreasing = TRUE)
+
+df <- as.data.frame(colData(dds)[,c("condition", "type")])
+
+# heatmap - cluster rows and cols
+pdf("heatmap_ntd_clustered_50.pdf")
+pheatmap(assay(ntd)[select[1:50],], cluster_rows=TRUE, cluster_cols=TRUE, show_rownames=FALSE, annotation_col=df, main = "Heatmap of count matrix of 50 genes")
+dev.off()
+
+# heatmap - cluster rows only
+pdf("heatmap_ntd_clustered_rows_50.pdf")
+pheatmap(assay(ntd)[select[1:50],], cluster_rows=TRUE, cluster_cols=FALSE, show_rownames=FALSE, annotation_col=df, main = "Heatmap of count matrix of 50 genes")
+dev.off()
+
+# heatmap - no clustering
+pdf("heatmap_ntd_not_clustered_50.pdf")
+pheatmap(assay(ntd)[select[1:50],], cluster_rows=FALSE, cluster_cols=FALSE, show_rownames=FALSE, annotation_col=df, main = "Heatmap of count matrix of 50 genes")
+dev.off()
+
+
 
